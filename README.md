@@ -73,4 +73,4 @@ Open http://localhost:3000
     ├── context/        # AuthContext (session state)
     ├── pages/          # Home, Marketplace, SignIn, SignUp, Dashboard, Docs
     └── styles/         # Global CSS
-```
+```# fick-off
