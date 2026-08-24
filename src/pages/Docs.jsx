@@ -10,8 +10,8 @@ export default function Docs() {
   useEffect(() => {
     api
       .getDocs()
-      .then((res) => setDocs(res.docs))
-      .catch((err) => setError(err.message))
+      .then((res) => setDocs(res?.docs || res?.data?.docs || res?.data || null))
+      .catch((err) => setError(err?.message || 'Failed to load API docs'))
       .finally(() => setLoading(false))
   }, [])
 

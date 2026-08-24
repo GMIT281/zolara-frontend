@@ -35,9 +35,9 @@ export default function Navbar() {
         <div className="nav-actions">
           {user ? (
             <>
-              <span className="user-chip" title={user.role}>
-                <span className="user-avatar">{user.name ? user.name[0].toUpperCase() : 'U'}</span>
-                <span className="user-name">{user.name}</span>
+              <span className="user-chip" title={user.role || 'user'}>
+                <span className="user-avatar">{(user.name?.[0] || user.email?.[0] || 'U').toUpperCase()}</span>
+                <span className="user-name">{user.name || user.email || 'User'}</span>
               </span>
               <button className="btn btn-ghost" onClick={handleLogout}>Sign Out</button>
             </>

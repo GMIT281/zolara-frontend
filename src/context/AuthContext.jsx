@@ -27,11 +27,17 @@ export function AuthProvider({ children }) {
   const signIn = (userData, authToken) => {
     setUser(userData)
     setToken(authToken)
+    if (userData) localStorage.setItem(STORAGE_KEY, JSON.stringify(userData))
+    else localStorage.removeItem(STORAGE_KEY)
+    if (authToken) localStorage.setItem('sem_token', authToken)
+    else localStorage.removeItem('sem_token')
   }
 
   const signOut = () => {
     setUser(null)
     setToken(null)
+    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem('sem_token')
   }
 
   return (

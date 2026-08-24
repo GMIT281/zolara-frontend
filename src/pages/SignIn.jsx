@@ -41,15 +41,21 @@ export default function SignIn() {
     const payload = method === 'no-password' ? { method, email: form.email } : { method, ...form }
 
     try {
-      const { user, token } = await api.signin(payload)
+      const res = await api.signin(payload)
+      const user = res?.user || res?.data?.user
+      const token = res?.token || res?.data?.token || ''
+      if (!user) {
+        throw new Error(res?.error || res?.message || 'Failed to authenticate')
+      }
       signIn(user, token)
       if (remember && form.email) sessionStorage.setItem('si-email', form.email)
       else sessionStorage.removeItem('si-email')
+      const displayName = user.name || user.email || 'User'
       finishSignIn(method === 'no-password'
-        ? `Secure link verified. Welcome, ${user.name || user.email}!`
-        : `Signed in successfully. Welcome back, ${user.name || user.email}!`)
+        ? `Secure link verified. Welcome, ${displayName}!`
+        : `Signed in successfully. Welcome back, ${displayName}!`)
     } catch (err) {
-      setError(err.message)
+      setError(err.message || 'Sign in failed')
     } finally {
       setLoading(false)
     }
@@ -61,15 +67,22 @@ export default function SignIn() {
     setError(null)
     setMessage(null)
     try {
-      const { user, token } = await api.signin({
+      const res = await api.signin({
         method: 'O-auth',
         email: provider === 'google' ? 'google.user@example.com' : 'apple.user@example.com',
         token: 'oauth-simulated-token'
       })
+      const user = res?.user || res?.data?.user
+      const token = res?.token || res?.data?.token || ''
+      if (!user) {
+        throw new Error(res?.error || res?.message || 'OAuth authentication failed')
+      }
       signIn(user, token)
-      finishSignIn(`Signed in with ${provider === 'google' ? 'Google' : 'Apple'}.`, 450)
+      const providerLabel = provider === 'google' ? 'Google' : 'Apple'
+      const displayName = user.name || user.email || 'User'
+      finishSignIn(`Signed in with ${providerLabel}. Welcome, ${displayName}!`, 450)
     } catch (err) {
-      setError(err.message)
+      setError(err.message || 'OAuth sign in failed')
     } finally {
       setLoading(false)
     }

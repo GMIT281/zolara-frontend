@@ -28,13 +28,15 @@ export default function Marketplace() {
     }
   })
 
+  const getPid = (item) => item?._id || item?.id || ''
+
   useEffect(() => {
     setLoading(true)
     setError(null)
     api
       .getMarketplace(category)
-      .then((res) => setProducts(res.products || []))
-      .catch((err) => setError(err.message))
+      .then((res) => setProducts(res?.products || res?.data?.products || (Array.isArray(res?.data) ? res.data : []) || []))
+      .catch((err) => setError(err?.message || 'Failed to load products'))
       .finally(() => setLoading(false))
   }, [category])
 
@@ -44,8 +46,11 @@ export default function Marketplace() {
   )
 
   const addToEnquiry = (product) => {
+    if (!product) return
     setEnquiries((current) => {
-      const next = current.some((item) => item.id === product.id) ? current : [...current, product]
+      const targetId = getPid(product)
+      const exists = current.some((item) => getPid(item) === targetId)
+      const next = exists ? current : [...current, product]
       localStorage.setItem('sem_enquiries', JSON.stringify(next))
       return next
     })
@@ -109,14 +114,17 @@ export default function Marketplace() {
               <div className="empty-state">No products in this category yet.</div>
             ) : (
               <div className="product-grid">
-                {products.map((p) => (
-                  <ProductCard
-                    key={p.id}
-                    product={p}
-                    onAddToEnquiry={addToEnquiry}
-                    isInEnquiry={enquiries.some((item) => item.id === p.id)}
-                  />
-                ))}
+                {products.map((p, idx) => {
+                  const pid = getPid(p) || `p-${idx}`
+                  return (
+                    <ProductCard
+                      key={pid}
+                      product={p}
+                      onAddToEnquiry={addToEnquiry}
+                      isInEnquiry={enquiries.some((item) => getPid(item) === pid)}
+                    />
+                  )
+                })}
               </div>
             )}
           </>

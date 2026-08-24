@@ -30,12 +30,17 @@ export default function SignUp() {
     try {
       const payload = { role, ...form }
       const res = await api.signup(payload)
-      const { user, token } = res
+      const user = res?.user || res?.data?.user
+      const token = res?.token || res?.data?.token || ''
+      if (!user) {
+        throw new Error(res?.error || res?.message || 'Failed to create account')
+      }
       signIn(user, token)
-      setMessage(`Account created — welcome, ${user.name}!`)
+      const displayName = user.name || user.email || 'User'
+      setMessage(`Account created — welcome, ${displayName}!`)
       setTimeout(() => navigate('/dashboard'), 700)
     } catch (err) {
-      setError(err.message)
+      setError(err.message || 'Failed to create account')
     } finally {
       setLoading(false)
     }

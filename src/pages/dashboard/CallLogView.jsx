@@ -16,8 +16,8 @@ export default function CallLogView() {
     setLoading(true)
     api
       .getCallLogs()
-      .then((res) => setLogs(res.callLogs || []))
-      .catch((err) => setError(err.message))
+      .then((res) => setLogs(res?.callLogs || res?.data?.callLogs || (Array.isArray(res?.data) ? res.data : []) || []))
+      .catch((err) => setError(err?.message || 'Failed to load call logs'))
       .finally(() => setLoading(false))
   }
 
@@ -31,13 +31,14 @@ export default function CallLogView() {
     setMessage(null)
     setError(null)
     try {
-      // POST /api/main-point/complain/call-log
       const res = await api.postCallLog(form)
-      setMessage(`Call log stored (${res.log.id})`)
+      const storedLog = res?.log || res?.data?.log || res?.data
+      const logId = storedLog?.id || storedLog?._id || 'saved'
+      setMessage(`Call log stored (${logId})`)
       setForm(EMPTY)
       loadLogs()
     } catch (err) {
-      setError(err.message)
+      setError(err?.message || 'Failed to store call log')
     } finally {
       setSubmitting(false)
     }
@@ -123,18 +124,23 @@ export default function CallLogView() {
             <div className="empty-state">No call logs yet. Submit your first log on the left.</div>
           ) : (
             <div className="log-list">
-              {logs.map((log) => (
-                <div className="log-item" key={log.id}>
-                  <div className="log-item-head">
-                    <strong>{log.companyName}</strong>
-                    <span className="log-status">{log.status}</span>
+              {logs.map((log, index) => {
+                const logKey = log?._id || log?.id || `log-${index}`
+                return (
+                  <div className="log-item" key={logKey}>
+                    <div className="log-item-head">
+                      <strong>{log?.companyName || 'Unknown Company'}</strong>
+                      <span className="log-status">{log?.status || 'logged'}</span>
+                    </div>
+                    <p>{log?.customer || 'Customer'} {log?.phone && <span className="muted">· {log.phone}</span>}</p>
+                    {log?.issue && <p className="muted">Issue: {log.issue}</p>}
+                    {log?.note && <p className="log-note">{log.note}</p>}
+                    {log?.createdAt && (
+                      <span className="log-date">{new Date(log.createdAt).toLocaleString()}</span>
+                    )}
                   </div>
-                  <p>{log.customer} {log.phone && <span className="muted">· {log.phone}</span>}</p>
-                  {log.issue && <p className="muted">Issue: {log.issue}</p>}
-                  {log.note && <p className="log-note">{log.note}</p>}
-                  <span className="log-date">{new Date(log.createdAt).toLocaleString()}</span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

@@ -21,8 +21,8 @@ export default function Home() {
     setError(null)
     api
       .getHome(type)
-      .then((res) => setData(res.data))
-      .catch((err) => setError(err.message))
+      .then((res) => setData(res?.data || res))
+      .catch((err) => setError(err?.message || 'Failed to load home content'))
       .finally(() => setLoading(false))
   }, [type])
 

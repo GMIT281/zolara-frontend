@@ -1,42 +1,93 @@
-// API client — all requests go through the Vite proxy (/api -> localhost:5000)
-const BASE = '/api'
+const API_BASE = '/api'
 
-async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options
-  })
-  const json = await res.json().catch(() => ({}))
-  if (!res.ok) {
-    throw new Error(json.error || `Request failed (${res.status})`)
+async function request(endpoint, options = {}) {
+  const url = `${API_BASE}${endpoint}`
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
   }
-  return json
+
+  const token = localStorage.getItem('sem_token')
+  if (token && !headers.Authorization) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  const config = {
+    ...options,
+    headers
+  }
+
+  let response
+  try {
+    response = await fetch(url, config)
+  } catch (networkError) {
+    throw new Error(`Network error: ${networkError.message || 'Failed to connect to server'}`)
+  }
+
+  let data
+  try {
+    data = await response.json()
+  } catch {
+    data = null
+  }
+
+  if (!response.ok) {
+    const errorMsg = data?.error || data?.message || `Request failed with status ${response.status}`
+    const error = new Error(errorMsg)
+    error.status = response.status
+    error.data = data
+    throw error
+  }
+
+  return data
 }
 
 export const api = {
-  // 1. Home routes
-  getHome: (type = 'on-grid') => request(`/home?type=${type}`),
+  // Home
+  getHome: (type = 'on-grid') =>
+    request(`/home?type=${encodeURIComponent(type)}`),
 
-  // 2. Authentication routes
+  // Auth
   signup: (payload) =>
-    request('/signup', { method: 'POST', body: JSON.stringify(payload) }),
+    request('/signup', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+
   signin: (payload) =>
-    request('/signin', { method: 'POST', body: JSON.stringify(payload) }),
+    request('/signin', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
 
-  // 3. Marketplace routes
+  // Marketplace
   getMarketplace: (category) =>
-    request(category ? `/marketplace?category=${category}` : '/marketplace'),
+    request(category ? `/marketplace?category=${encodeURIComponent(category)}` : '/marketplace'),
 
-  // 4. Main Point (Core Dashboard) routes
-  getListing: () => request('/main-point/complain/listing'),
-  getCallLogs: () => request('/main-point/complain/call-log'),
+  // Main Point (Core Dashboard)
+  getListing: () =>
+    request('/main-point/complain/listing'),
+
+  getCallLogs: () =>
+    request('/main-point/complain/call-log'),
+
   postCallLog: (payload) =>
-    request('/main-point/complain/call-log', { method: 'POST', body: JSON.stringify(payload) }),
-  postCompanyComplaint: (id, payload) =>
-    request(`/main-point/complain/company/${id}`, { method: 'POST', body: JSON.stringify(payload) }),
-  getInstallerTeams: (id) => request(`/main-point/installer/company/${id}`),
-  getDocs: () => request('/main-point/docs'),
+    request('/main-point/complain/call-log', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
 
-  // Health
-  health: () => request('/health')
+  postCompanyComplaint: (companyId, payload) =>
+    request(`/main-point/complain/company/${encodeURIComponent(companyId)}`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+
+  getInstallerTeams: (companyId) =>
+    request(companyId ? `/main-point/installer/company/${encodeURIComponent(companyId)}` : '/main-point/installer/company/'),
+
+  getDocs: () =>
+    request('/main-point/docs')
 }
+
+export default api

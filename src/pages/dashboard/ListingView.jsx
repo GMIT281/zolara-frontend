@@ -16,8 +16,8 @@ export default function ListingView() {
   useEffect(() => {
     api
       .getListing()
-      .then((res) => setListing(res.listing || []))
-      .catch((err) => setError(err.message))
+      .then((res) => setListing(res?.listing || res?.data?.listing || (Array.isArray(res?.data) ? res.data : []) || []))
+      .catch((err) => setError(err?.message || 'Failed to load company listings'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -32,11 +32,11 @@ export default function ListingView() {
     setError(null)
     setSubmitting(true)
     try {
-      // POST /api/main-point/complain/company/:id (dynamically generated endpoint)
-      const res = await api.postCompanyComplaint(complaint.id, complainForm)
-      setTicket(res.ticket)
+      const companyId = complaint?._id || complaint?.id
+      const res = await api.postCompanyComplaint(companyId, complainForm)
+      setTicket(res?.ticket || res?.data?.ticket || res?.data)
     } catch (err) {
-      setError(err.message)
+      setError(err?.message || 'Failed to register complaint')
     } finally {
       setSubmitting(false)
     }
@@ -54,70 +54,79 @@ export default function ListingView() {
 
       {!loading && !error && (
         <div className="company-list">
-          {listing.map((company) => (
-            <article className="company-card" key={company.id}>
-              <div className="company-card-head">
-                <div>
-                  <h3>
-                    {company.name}
-                    {company.verified && <span className="verified-badge" title="Verified"><BadgeCheck aria-hidden="true" /> Verified</span>}
-                  </h3>
-                  <p className="company-loc">
-                    {company.location} · {company.type}
-                  </p>
-                  <div className="company-tags">
-                    {company.services?.map((s) => <span className="tag" key={s}>{s}</span>)}
+          {listing.map((company) => {
+            const compId = company?._id || company?.id
+            const companyListings = company?.listings || company?.list || []
+            return (
+              <article className="company-card" key={compId}>
+                <div className="company-card-head">
+                  <div>
+                    <h3>
+                      {company?.name || 'Unnamed Company'}
+                      {company?.verified && <span className="verified-badge" title="Verified"><BadgeCheck aria-hidden="true" /> Verified</span>}
+                    </h3>
+                    <p className="company-loc">
+                      {company?.location || 'India'} · {company?.type || 'Partner'}
+                    </p>
+                    <div className="company-tags">
+                      {company?.services?.map((s) => <span className="tag" key={s}>{s}</span>)}
+                    </div>
+                  </div>
+                  <div className="company-card-actions">
+                    {company?.rating && <span className="rating-lg"><Star aria-hidden="true" fill="currentColor" /> {company.rating}</span>}
+                    <button className="btn btn-outline btn-sm" onClick={() => setExpanded(expanded === compId ? null : compId)}>
+                      {expanded === compId ? 'Hide Listings' : 'View Listings'}
+                    </button>
+                    <button className="btn btn-primary btn-sm" onClick={() => openComplaint(company)}>
+                      Log Complaint
+                    </button>
                   </div>
                 </div>
-                <div className="company-card-actions">
-                  <span className="rating-lg"><Star aria-hidden="true" fill="currentColor" /> {company.rating}</span>
-                  <button className="btn btn-outline btn-sm" onClick={() => setExpanded(expanded === company.id ? null : company.id)}>
-                    {expanded === company.id ? 'Hide Listings' : 'View Listings'}
-                  </button>
-                  <button className="btn btn-primary btn-sm" onClick={() => openComplaint(company)}>
-                    Log Complaint
-                  </button>
-                </div>
-              </div>
 
-              {expanded === company.id && (
-                <div className="company-listings">
-                  <h4>Listings</h4>
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Service / Package</th>
-                        <th>Price</th>
-                        <th>Duration</th>
-                        <th>Warranty</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {company.listings?.map((l, i) => (
-                        <tr key={i}>
-                          <td>{l.title}</td>
-                          <td>{l.price}</td>
-                          <td>{l.duration}</td>
-                          <td>{l.warranty}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </article>
-          ))}
+                {expanded === compId && (
+                  <div className="company-listings">
+                    <h4>Listings</h4>
+                    {companyListings.length === 0 ? (
+                      <p className="muted">No packages listed yet.</p>
+                    ) : (
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>Service / Package</th>
+                            <th>Price</th>
+                            <th>Duration</th>
+                            <th>Warranty</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {companyListings.map((l, i) => (
+                            <tr key={i}>
+                              <td>{l?.title || l?.name || 'Service Package'}</td>
+                              <td>{l?.price || '—'}</td>
+                              <td>{l?.duration || '—'}</td>
+                              <td>{l?.warranty || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+              </article>
+            )
+          })}
         </div>
       )}
-{/* Complaint modal */}
+
+      {/* Complaint modal */}
       {complaint && (
         <div className="modal-backdrop" onClick={() => setComplaint(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             {!ticket ? (
               <>
-                <h3>Log Complaint — {complaint.name}</h3>
+                <h3>Log Complaint — {complaint?.name || 'Company'}</h3>
                 <p className="modal-sub">
-                  POST <code>/api/main-point/complain/company/{complaint.id}</code>
+                  POST <code>/api/main-point/complain/company/{complaint?._id || complaint?.id}</code>
                 </p>
                 <form onSubmit={submitComplaint}>
                   <label className="field">
@@ -152,10 +161,12 @@ export default function ListingView() {
               <div className="ticket-success">
                 <span className="ticket-icon"><CircleCheck aria-hidden="true" /></span>
                 <h3>Complaint Registered</h3>
-                <p><strong>Ticket:</strong> {ticket.ticketId}</p>
-                <p><strong>Company:</strong> {ticket.companyName}</p>
-                <p><strong>Status:</strong> {ticket.status}</p>
-                <p className="ticket-date">Generated at {new Date(ticket.generatedAt).toLocaleString()}</p>
+                <p><strong>Ticket:</strong> {ticket?.ticketId || ticket?._id || ticket?.id || 'Registered'}</p>
+                <p><strong>Company:</strong> {ticket?.companyName || complaint?.name || 'Company'}</p>
+                <p><strong>Status:</strong> {ticket?.status || 'open'}</p>
+                {ticket?.generatedAt && (
+                  <p className="ticket-date">Generated at {new Date(ticket.generatedAt).toLocaleString()}</p>
+                )}
                 <button className="btn btn-primary btn-block" onClick={() => setComplaint(null)}>Done</button>
               </div>
             )}

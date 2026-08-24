@@ -30,9 +30,9 @@ export default function Dashboard() {
     <div className="dashboard-page">
       <aside className="dash-sidebar">
         <div className="dash-user">
-          <span className="user-avatar lg">{user?.name?.[0] || 'U'}</span>
+          <span className="user-avatar lg">{(user?.name?.[0] || user?.email?.[0] || 'U').toUpperCase()}</span>
           <div>
-            <strong>{user?.name}</strong>
+            <strong>{user?.name || user?.email || 'User'}</strong>
             <span className="dash-role">{user?.role || 'user'}</span>
           </div>
         </div>

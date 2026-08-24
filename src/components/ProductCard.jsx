@@ -8,21 +8,23 @@ const CATEGORY_LABELS = {
   BOS: 'BOS'
 }
 
-export default function ProductCard({ product, onAddToEnquiry, isInEnquiry = false }) {
+export default function ProductCard({ product = {}, onAddToEnquiry, isInEnquiry = false }) {
+  if (!product) return null
+
   const price = typeof product.price === 'number'
     ? `₹${product.price.toLocaleString('en-IN')}`
-    : product.price
+    : (product.price || '—')
 
   return (
     <article className="product-card">
       <div className="product-img">
-        <img src={product.image} alt={product.name} loading="lazy" />
+        {product.image && <img src={product.image} alt={product.name || 'Solar product'} loading="lazy" />}
         {product.category && (
           <span className="product-badge">{CATEGORY_LABELS[product.category] || product.category}</span>
         )}
       </div>
       <div className="product-body">
-        <h3 className="product-name">{product.name}</h3>
+        <h3 className="product-name">{product.name || 'Solar Product'}</h3>
         {product.brand && <p className="product-brand">{product.brand}</p>}
         <p className="product-desc">{product.desc}</p>
         <div className="product-meta">
