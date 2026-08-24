@@ -112,9 +112,10 @@ export default function SignUp() {
           </label>
 
           <label className="field">
-            <span>Phone (optional)</span>
+            <span>Phone Number</span>
             <input
               type="tel"
+              required
               value={form.phone}
               placeholder="+91 98xxxxxx"
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
