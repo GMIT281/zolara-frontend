@@ -1,36 +1,53 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Globe2, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
+import {
+  Apple, ArrowRight, BadgeCheck, Eye, EyeOff, KeyRound, LockKeyhole,
+  Mail, ShieldCheck, SunMedium, Zap
+} from 'lucide-react'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { Spinner } from '../components/Loader'
 
-const METHODS = [
-  { key: 'JWT-auth', label: 'JWT Auth', icon: LockKeyhole, desc: 'Email + password' },
-  { key: 'O-auth', label: 'OAuth', icon: Globe2, desc: 'Google / Apple login' },
-  { key: 'no-password', label: 'No Password', icon: Mail, desc: 'Magic link / OTP' }
+const BENEFITS = [
+  'Manage products, enquiries and installations in one place.',
+  'Work with verified sellers and installation partners.',
+  'Keep every support request and update in your account.'
 ]
 
 export default function SignIn() {
   const { signIn } = useAuth()
   const navigate = useNavigate()
-  const [method, setMethod] = useState('JWT-auth')
-  const [form, setForm] = useState({ email: '', password: '', token: '' })
+  const [mode, setMode] = useState('password')
+  const [form, setForm] = useState(() => ({
+    email: sessionStorage.getItem('si-email') || '', password: '', token: ''
+  }))
+  const [showPw, setShowPw] = useState(false)
+  const [remember, setRemember] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [message, setMessage] = useState(null)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const finishSignIn = (text, delay = 550) => {
+    setMessage(text)
+    setTimeout(() => navigate('/dashboard'), delay)
+  }
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
     setLoading(true)
     setError(null)
     setMessage(null)
+    const method = mode === 'magic' ? 'no-password' : 'JWT-auth'
+    const payload = method === 'no-password' ? { method, email: form.email } : { method, ...form }
+
     try {
-      const res = await api.signin({ method, ...form })
-      const { user, token } = res
+      const { user, token } = await api.signin(payload)
       signIn(user, token)
-      setMessage(`Signed in via ${method} as ${user.name || user.email}`)
-      setTimeout(() => navigate('/dashboard'), 600)
+      if (remember && form.email) sessionStorage.setItem('si-email', form.email)
+      else sessionStorage.removeItem('si-email')
+      finishSignIn(method === 'no-password'
+        ? `Secure link verified. Welcome, ${user.name || user.email}!`
+        : `Signed in successfully. Welcome back, ${user.name || user.email}!`)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -38,101 +55,137 @@ export default function SignIn() {
     }
   }
 
-  const quickFill = () => {
+  const handleOauth = async (provider) => {
+    if (loading) return
+    setLoading(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const { user, token } = await api.signin({
+        method: 'O-auth',
+        email: provider === 'google' ? 'google.user@example.com' : 'apple.user@example.com',
+        token: 'oauth-simulated-token'
+      })
+      signIn(user, token)
+      finishSignIn(`Signed in with ${provider === 'google' ? 'Google' : 'Apple'}.`, 450)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fillDemo = () => {
+    setMode('password')
     setForm({ email: 'demo@solarmarket.in', password: 'demo123', token: '' })
-    setMethod('JWT-auth')
+    setError(null)
+    setMessage('Demo credentials are ready. Select “Sign in” to continue.')
+  }
+
+  const switchMode = (nextMode) => {
+    setMode(nextMode)
+    setError(null)
+    setMessage(null)
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-head">
-          <span className="auth-icon"><ShieldCheck aria-hidden="true" /></span>
-          <h1>Welcome Back</h1>
-          <p>
-            Sign in to Solar E-Market via{' '}
-            <code>POST /api/signin</code>
-          </p>
-        </div>
+    <div className="si-page">
+      <div className="si-shell">
+        <aside className="si-brand" aria-label="Solar E-Market account benefits">
+          <Link to="/" className="si-logo">
+            <span className="si-logo-mark"><SunMedium aria-hidden="true" /></span>
+            <span>Solar <b>E-Market</b></span>
+          </Link>
 
-        <div className="method-tabs">
-          {METHODS.map((m) => (
-            <button
-              key={m.key}
-              type="button"
-              className={`method-tab ${method === m.key ? 'active' : ''}`}
-              onClick={() => setMethod(m.key)}
-            >
-              <span className="method-icon"><m.icon aria-hidden="true" /></span>
-              <strong>{m.label}</strong>
-              <small>{m.desc}</small>
-            </button>
-          ))}
-        </div>
+          <div className="si-brand-copy">
+            <span className="si-brand-kicker"><BadgeCheck aria-hidden="true" /> Secure business portal</span>
+            <h1>Everything solar, connected.</h1>
+            <p>Access the tools and trusted partners that keep your solar business moving.</p>
+          </div>
 
-        <form onSubmit={handleSubmit} className="auth-form">
-          {method === 'O-auth' && (
-            <div className="oauth-buttons">
-              <button type="button" className="btn oauth-btn" onClick={() => { setForm((f) => ({ ...f, email: 'google.user@example.com' })); setMessage('OAuth provider selected — use any email to continue (simulated).') }}>
-                <span className="g-logo">G</span> Continue with Google
-              </button>
-              <button type="button" className="btn oauth-btn" onClick={() => { setForm((f) => ({ ...f, email: 'apple.user@example.com' })); setMessage('OAuth provider selected — use any email to continue (simulated).') }}>
-                Continue with Apple
-              </button>
+          <ul className="si-benefits">
+            {BENEFITS.map((benefit) => (
+              <li key={benefit}><span><Zap aria-hidden="true" /></span>{benefit}</li>
+            ))}
+          </ul>
+
+          <div className="si-brand-footer">
+            <div className="si-partners"><strong>350+</strong><span>verified partners<br />across India</span></div>
+            <span className="si-footer-note"><ShieldCheck aria-hidden="true" /> Trusted platform access</span>
+          </div>
+        </aside>
+
+        <section className="si-form-wrap">
+          <div className="si-card">
+            <div className="si-topline">
+              <span>Account access</span>
+              <Link to="/signup">Create account <ArrowRight aria-hidden="true" /></Link>
             </div>
-          )}
 
-          <label className="field">
-            <span>Email</span>
-            <input
-              type="email"
-              required
-              value={form.email}
-              placeholder="you@example.com"
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-            />
-          </label>
+            <div className="si-head">
+              <h2>{mode === 'magic' ? 'Sign in with a secure link' : 'Welcome back'}</h2>
+              <p>{mode === 'magic'
+                ? 'Enter your email and we’ll send a secure, password-free sign-in link.'
+                : 'Sign in to your Solar E-Market account to continue.'}
+              </p>
+            </div>
 
-          {method === 'JWT-auth' && (
-            <label className="field">
-              <span>Password</span>
-              <input
-                type="password"
-                required
-                value={form.password}
-                placeholder="••••••••"
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-              />
-            </label>
-          )}
+            {mode === 'password' && <>
+              <div className="si-socials">
+                <button type="button" className="si-social" disabled={loading} onClick={() => handleOauth('google')}>
+                  <span className="si-google">G</span> Continue with Google
+                </button>
+                <button type="button" className="si-social" disabled={loading} onClick={() => handleOauth('apple')}>
+                  <Apple aria-hidden="true" /> Continue with Apple
+                </button>
+              </div>
+              <div className="si-divider"><span>or use your email</span></div>
+            </>}
 
-          {method === 'O-auth' && (
-            <label className="field">
-              <span>OAuth Token (simulated)</span>
-              <input
-                type="text"
-                value={form.token}
-                placeholder="paste-oauth-token (optional)"
-                onChange={(e) => setForm({ ...form, token: e.target.value })}
-              />
-            </label>
-          )}
+            {error && <div className="alert alert-error">{error}</div>}
+            {message && <div className="alert alert-success">{message}</div>}
 
-          {error && <div className="alert alert-error">{error}</div>}
-          {message && <div className="alert alert-success">{message}</div>}
+            <form className="si-form" onSubmit={handleSubmit}>
+              <label className="si-field">
+                <span className="si-label">Work email</span>
+                <div className="si-in">
+                  <Mail aria-hidden="true" />
+                  <input type="email" autoComplete="email" required placeholder="you@company.in" value={form.email}
+                    onChange={(event) => setForm({ ...form, email: event.target.value })} />
+                </div>
+              </label>
 
-          <button className="btn btn-primary btn-block" disabled={loading}>
-            {loading ? <Spinner small /> : `Sign In with ${method}`}
-          </button>
-        </form>
+              {mode === 'password' && <>
+                <label className="si-field">
+                  <span className="si-label"><span>Password</span><button type="button" className="si-forgot" onClick={() => setMessage('Password recovery is available through support@solarmarket.in.')}>Forgot password?</button></span>
+                  <div className="si-in si-password">
+                    <LockKeyhole aria-hidden="true" />
+                    <input type={showPw ? 'text' : 'password'} autoComplete="current-password" required placeholder="Enter your password" value={form.password}
+                      onChange={(event) => setForm({ ...form, password: event.target.value })} />
+                    <button type="button" className="si-eye" aria-label={showPw ? 'Hide password' : 'Show password'} onClick={() => setShowPw(!showPw)}>
+                      {showPw ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+                    </button>
+                  </div>
+                </label>
+                <label className="si-check"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /><span>Keep me signed in for 30 days</span></label>
+              </>}
 
-        <div className="auth-alt">
-          <button className="link-btn" onClick={quickFill}>Fill demo credentials (demo@solarmarket.in / demo123)</button>
-        </div>
+              <button className="si-submit" type="submit" disabled={loading}>
+                {loading ? <Spinner small /> : <>{mode === 'magic' ? 'Email secure link' : 'Sign in'}<ArrowRight aria-hidden="true" /></>}
+              </button>
+            </form>
 
-        <p className="auth-switch">
-          New here? <Link to="/signup">Create an account</Link>
-        </p>
+            <button type="button" className="si-switch-btn" onClick={() => switchMode(mode === 'password' ? 'magic' : 'password')}>
+              {mode === 'password' ? 'Prefer password-free access? ' : 'Want to use a password instead? '}<u>{mode === 'password' ? 'Email me a secure link' : 'Sign in with password'}</u>
+            </button>
+
+            <button type="button" className="si-demo" onClick={fillDemo}>
+              <KeyRound aria-hidden="true" /><span><strong>Use the demo account</strong><small>Preview the dashboard with sample credentials</small></span><ArrowRight aria-hidden="true" />
+            </button>
+
+            <p className="si-security"><ShieldCheck aria-hidden="true" /> Your sign-in is protected with SSL encryption.</p>
+          </div>
+        </section>
       </div>
     </div>
   )

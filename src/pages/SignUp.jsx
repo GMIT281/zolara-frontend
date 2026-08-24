@@ -90,12 +90,12 @@ export default function SignUp() {
           )}
 
           <label className="field">
-            <span>Business Email</span>
+            <span>{role === 'user' ? 'Email Address' : 'Business Email'}</span>
             <input
               type="email"
               required
               value={form.email}
-              placeholder="you@company.in"
+              placeholder={role === 'user' ? 'you@example.com' : 'you@company.in'}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
             />
           </label>
