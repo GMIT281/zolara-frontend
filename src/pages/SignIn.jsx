@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  Apple, ArrowRight, BadgeCheck, Eye, EyeOff, KeyRound, LockKeyhole,
+  ArrowRight, BadgeCheck, Eye, EyeOff, LockKeyhole,
   Mail, ShieldCheck, SunMedium, Zap
 } from 'lucide-react'
 import { api } from '../api/client'
@@ -69,8 +69,8 @@ export default function SignIn() {
     try {
       const res = await api.signin({
         method: 'O-auth',
-        email: provider === 'google' ? 'google.user@example.com' : 'apple.user@example.com',
-        token: 'oauth-simulated-token'
+        email: form.email,
+        token: form.token
       })
       const user = res?.user || res?.data?.user
       const token = res?.token || res?.data?.token || ''
@@ -78,21 +78,13 @@ export default function SignIn() {
         throw new Error(res?.error || res?.message || 'OAuth authentication failed')
       }
       signIn(user, token)
-      const providerLabel = provider === 'google' ? 'Google' : 'Apple'
       const displayName = user.name || user.email || 'User'
-      finishSignIn(`Signed in with ${providerLabel}. Welcome, ${displayName}!`, 450)
+      finishSignIn(`Signed in with ${provider}. Welcome, ${displayName}!`, 450)
     } catch (err) {
       setError(err.message || 'OAuth sign in failed')
     } finally {
       setLoading(false)
     }
-  }
-
-  const fillDemo = () => {
-    setMode('password')
-    setForm({ email: 'demo@solarmarket.in', password: 'demo123', token: '' })
-    setError(null)
-    setMessage('Demo credentials are ready. Select “Sign in” to continue.')
   }
 
   const switchMode = (nextMode) => {
@@ -144,15 +136,7 @@ export default function SignIn() {
             </div>
 
             {mode === 'password' && <>
-              <div className="si-socials">
-                <button type="button" className="si-social" disabled={loading} onClick={() => handleOauth('google')}>
-                  <span className="si-google">G</span> Continue with Google
-                </button>
-                <button type="button" className="si-social" disabled={loading} onClick={() => handleOauth('apple')}>
-                  <Apple aria-hidden="true" /> Continue with Apple
-                </button>
-              </div>
-              <div className="si-divider"><span>or use your email</span></div>
+              <div className="si-divider"><span>use your email</span></div>
             </>}
 
             {error && <div className="alert alert-error">{error}</div>}
@@ -190,10 +174,6 @@ export default function SignIn() {
 
             <button type="button" className="si-switch-btn" onClick={() => switchMode(mode === 'password' ? 'magic' : 'password')}>
               {mode === 'password' ? 'Prefer password-free access? ' : 'Want to use a password instead? '}<u>{mode === 'password' ? 'Email me a secure link' : 'Sign in with password'}</u>
-            </button>
-
-            <button type="button" className="si-demo" onClick={fillDemo}>
-              <KeyRound aria-hidden="true" /><span><strong>Use the demo account</strong><small>Preview the dashboard with sample credentials</small></span><ArrowRight aria-hidden="true" />
             </button>
 
             <p className="si-security"><ShieldCheck aria-hidden="true" /> Your sign-in is protected with SSL encryption.</p>

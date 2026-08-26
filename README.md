@@ -17,13 +17,9 @@ npm run dev
 
 Open http://localhost:3000
 
-## Demo Credentials
+## Accounts & Authentication
 
-| Role       | Email                    | Password     |
-|------------|--------------------------|--------------|
-| User       | demo@solarmarket.in      | demo123      |
-| Seller Co  | seller@solarmarket.in    | seller123    |
-| Install Co | installer@solarmarket.in | install123   |
+No demo accounts are seeded. Create an account via **Sign Up** (`POST /api/signup`). Sign-in (`POST /api/signin`) only works for accounts created on the platform; OAuth and password-free (magic-link) access also require an existing account. All dashboard data is fetched live from the API and reflects what the backend actually returns (empty until real data is present).
 
 ## API Endpoints
 
