@@ -1,4 +1,4 @@
-# Solar E-Market
+# ENRG — Solar Marketplace
 
 A React.js solar energy marketplace with a Node/Express API backend.
 

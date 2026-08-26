@@ -1,14 +1,13 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { BatteryCharging, PlugZap, SunMedium, Zap } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import Loader from '../components/Loader'
-
-const GRID_TYPES = [
-  { key: 'on-grid', label: 'On-Grid', icon: PlugZap, desc: 'Grid-connected systems with net metering' },
-  { key: 'off-grid', label: 'Off-Grid', icon: BatteryCharging, desc: 'Battery-backed standalone systems' },
-  { key: 'hybrid-grid', label: 'Hybrid-Grid', icon: Zap, desc: 'Grid + battery flexibility combined' }
-]
+import CodaHero from '../components/coda/CodaHero'
+import CodaTabBar from '../components/coda/CodaTabBar'
+import CodaProductVisualizer from '../components/coda/CodaProductVisualizer'
+import CodaCardCluster from '../components/coda/CodaCardCluster'
+import CodaStatsCarousel from '../components/coda/CodaStatsCarousel'
+import CodaImpactCarousel from '../components/coda/CodaImpactCarousel'
+import CodaCTACard from '../components/coda/CodaCTACard'
 
 export default function Home() {
   const [type, setType] = useState('on-grid')
@@ -22,123 +21,41 @@ export default function Home() {
     api
       .getHome(type)
       .then((res) => setData(res?.data || res))
-      .catch((err) => setError(err?.message || 'Failed to load home content'))
+      .catch((err) => {
+        console.warn('Fallback home data used:', err?.message)
+        setData(null)
+      })
       .finally(() => setLoading(false))
   }, [type])
 
-  const active = GRID_TYPES.find((g) => g.key === type)
-
   return (
-    <div className="home-page">
-      {/* Hero */}
-      <section className="hero">
-        <div className="container hero-grid">
-          <div className="hero-copy">
-            <span className="hero-eyebrow"><SunMedium aria-hidden="true" /> India&rsquo;s Solar E-Marketplace</span>
-            <h1 className="hero-title">{loading ? 'Loading…' : data?.headline || 'Solar made simple'}</h1>
-            <p className="hero-sub">
-              {loading ? 'Fetching live data…' : data?.subheadline || 'Explore verified solar products and installation partners.'}
-            </p>
-            <div className="hero-cta">
-              <Link to="/marketplace" className="btn btn-primary btn-lg">Browse Marketplace</Link>
-              <Link to="/signup" className="btn btn-outline btn-lg">Join as Seller / Installer</Link>
-            </div>
-          </div>
+    <div className="coda-home-page">
+      {/* 1. Coda Hero Section */}
+      <CodaHero
+        headline={data?.headline}
+        subheadline={data?.subheadline}
+        loading={loading}
+      />
 
-          <div className="hero-visual">
-            {data?.heroImage && (
-              <div className="hero-img-wrap">
-                <img src={data.heroImage} alt={active?.label} />
-                <div className="hero-stats">
-                  {data.stats?.map((s, i) => (
-                    <div className="stat-chip" key={i}>
-                      <strong>{s.value}</strong>
-                      <span>{s.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+      {/* 2. Coda System Switcher TabBar & Product Visualizer */}
+      <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <CodaTabBar activeType={type} onChangeType={setType} />
+        <CodaProductVisualizer activeType={type} data={data} />
+      </div>
 
-      {/* Grid type selector */}
-      <section className="container section">
-        <div className="section-head">
-          <h2>Choose Your System Type</h2>
-          <p>Pick a configuration — content updates live from <code>GET /api/home?type=…</code></p>
-        </div>
-        <div className="grid-selector">
-          {GRID_TYPES.map((g) => (
-            <button
-              key={g.key}
-              className={`grid-option ${type === g.key ? 'active' : ''}`}
-              onClick={() => setType(g.key)}
-            >
-              <span className="grid-icon"><g.icon aria-hidden="true" /></span>
-              <strong>{g.label}</strong>
-              <small>{g.desc}</small>
-            </button>
-          ))}
-        </div>
-      </section>
+      {/* 3. Coda Card Cluster: Spotlight & Feature Grids */}
+      <CodaCardCluster />
 
-      {/* Content area */}
-      <section className="container section">
-        {loading && <Loader text={`Loading ${active?.label} content…`} />}
-        {error && <div className="alert alert-error">Failed to load: {error}</div>}
+      {/* 4. Coda Stats Carousel: Numeric Proof Badges */}
+      <div className="container">
+        <CodaStatsCarousel />
+      </div>
 
-        {!loading && !error && data && (
-          <>
-            {/* Stats */}
-            <div className="stats-row">
-              {data.stats?.map((s, i) => (
-                <div className="stat-card" key={i}>
-                  <span className="stat-value">{s.value}</span>
-                  <span className="stat-label">{s.label}</span>
-                </div>
-              ))}
-            </div>
+      {/* 5. Coda Impact Testimonials & Case Studies */}
+      <CodaImpactCarousel />
 
-            {/* Features */}
-            <div className="features-grid">
-              {data.features?.map((f, i) => (
-                <div className="feature-card" key={i}>
-                  <span className="feature-num">{String(i + 1).padStart(2, '0')}</span>
-                  <h3>{f.title}</h3>
-                  <p>{f.desc}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Featured products */}
-            <div className="section-inner">
-              <div className="section-head">
-                <h2>Popular {active?.label} Packages</h2>
-              </div>
-              <div className="mini-product-grid">
-                {data.products?.map((p, i) => (
-                  <div className="mini-product" key={i}>
-                    <span className="mini-cat">{p.category}</span>
-                    <h3>{p.name}</h3>
-                    <span className="mini-price">{p.price}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-      </section>
-
-      {/* CTA */}
-      <section className="cta-band">
-        <div className="container cta-inner">
-          <h2>{data?.cta?.title || 'Ready to go solar?'}</h2>
-          <p>Our verified partners handle everything from design to installation.</p>
-          <Link to="/signup" className="btn btn-light btn-lg">{data?.cta?.button || 'Get Started'}</Link>
-        </div>
-      </section>
+      {/* 6. Coda High-Impact CTA Banner with Sizing Calculator */}
+      <CodaCTACard />
     </div>
   )
 }

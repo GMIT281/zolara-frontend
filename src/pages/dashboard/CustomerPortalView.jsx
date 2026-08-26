@@ -303,7 +303,7 @@ export default function CustomerPortalView() {
           </div>
 
           <div className="panel side-info-panel">
-            <h3>Why Request Through Solar E-Market?</h3>
+            <h3>Why Request Through ENRG?</h3>
             <ul className="feature-bullets">
               <li>
                 <ShieldCheck className="bullet-icon" size={20} />

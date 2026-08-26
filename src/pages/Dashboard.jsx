@@ -98,7 +98,7 @@ export default function Dashboard() {
         {section === 'overview' && (
           <div>
             <div className="dash-head">
-              <h1>Solar E-Market Control Centre</h1>
+              <h1>ENRG Control Centre</h1>
               <p>Unified enterprise portal across Customer, Company, and Marketplace Admin domains.</p>
             </div>
 

@@ -96,10 +96,10 @@ export default function SignIn() {
   return (
     <div className="si-page">
       <div className="si-shell">
-        <aside className="si-brand" aria-label="Solar E-Market account benefits">
+        <aside className="si-brand" aria-label="ENRG account benefits">
           <Link to="/" className="si-logo">
             <span className="si-logo-mark"><SunMedium aria-hidden="true" /></span>
-            <span>Solar <b>E-Market</b></span>
+            <span>ENRG</span>
           </Link>
 
           <div className="si-brand-copy">
@@ -131,7 +131,7 @@ export default function SignIn() {
               <h2>{mode === 'magic' ? 'Sign in with a secure link' : 'Welcome back'}</h2>
               <p>{mode === 'magic'
                 ? 'Enter your email and we’ll send a secure, password-free sign-in link.'
-                : 'Sign in to your Solar E-Market account to continue.'}
+                : 'Sign in to your ENRG account to continue.'}
               </p>
             </div>
 

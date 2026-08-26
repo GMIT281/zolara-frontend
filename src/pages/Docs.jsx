@@ -20,7 +20,7 @@ export default function Docs() {
       <section className="page-hero">
         <div className="container">
           <h1>API Documentation</h1>
-          <p>Complete reference for the Solar E-Market API — <code>GET /api/main-point/docs</code></p>
+          <p>Complete reference for the ENRG Solar Marketplace API — <code>GET /api/main-point/docs</code></p>
         </div>
       </section>
 

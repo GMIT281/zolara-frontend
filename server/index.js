@@ -1,6 +1,5 @@
 // ============================================================
-// Solar E-Market — API Server (Express)
-// Implements Customer, Company, Admin, Home, Auth, Marketplace & Main-Point routes.
+// ENRG — SOLAR MARKETPLACE API SERVER
 // ============================================================
 import express from 'express'
 import cors from 'cors'
@@ -8,8 +7,6 @@ import {
   homeContent,
   marketplaceProducts,
   allCompanies,
-  companies,
-  company3,
   callLogs,
   users,
   customers,
@@ -29,12 +26,119 @@ const PORT = process.env.PORT || 5000
 app.use(cors())
 app.use(express.json({ limit: '10mb' }))
 
-// ------------------------------------------------------------
-// 1. CUSTOMER APIS
-// ------------------------------------------------------------
+// ============================================================
+// 1. AUTHENTICATION & ONBOARDING
+// ============================================================
+
+// POST /api/signup
+// Payload expected: { role: 'seller-co' | 'install-co' | 'user', ...userDetails }
+app.post('/api/signup', (req, res) => {
+  const { role = 'user', name, email, phone, password } = req.body || {}
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' })
+  }
+
+  if (users.some((u) => u.email?.toLowerCase() === email.toLowerCase())) {
+    return res.status(400).json({ error: 'An account with this email already exists.' })
+  }
+
+  const validRoles = ['seller-co', 'install-co', 'user']
+  const assignedRole = validRoles.includes(role) ? role : 'user'
+
+  const newUser = {
+    id: `u-${users.length + 1}`,
+    role: assignedRole,
+    name: name || email.split('@')[0],
+    email,
+    phone: phone || '',
+    password,
+    method: 'JWT-auth',
+    createdAt: new Date().toISOString()
+  }
+
+  users.push(newUser)
+
+  const token = `jwt-token-${newUser.id}`
+  res.status(201).json({
+    success: true,
+    message: 'Account created successfully',
+    token,
+    user: {
+      id: newUser.id,
+      role: newUser.role,
+      name: newUser.name,
+      email: newUser.email,
+      phone: newUser.phone
+    }
+  })
+})
+
+// POST /api/signin
+// Payload expected: { method: 'O-auth' | 'JWT-auth' | 'no-password', ...credentials }
+app.post('/api/signin', (req, res) => {
+  const { method = 'JWT-auth', email, password, oauthProvider } = req.body || {}
+
+  if (!email && method !== 'O-auth') {
+    return res.status(400).json({ error: 'Email is required for sign in.' })
+  }
+
+  let user = users.find((u) => u.email?.toLowerCase() === email?.toLowerCase())
+
+  if (method === 'no-password') {
+    if (!user) {
+      return res.status(404).json({ error: 'No account found for this email. Please sign up first.' })
+    }
+    const token = `magic-token-${user.id}`
+    return res.json({
+      success: true,
+      message: 'Magic sign-in successful',
+      token,
+      user: { id: user.id, role: user.role, name: user.name, email: user.email, phone: user.phone }
+    })
+  }
+
+  if (method === 'O-auth') {
+    const oauthEmail = email || `user-${Date.now()}@oauth.enrg.in`
+    user = users.find((u) => u.email?.toLowerCase() === oauthEmail.toLowerCase())
+    if (!user) {
+      user = {
+        id: `u-oauth-${users.length + 1}`,
+        role: 'user',
+        name: req.body?.name || `OAuth User`,
+        email: oauthEmail,
+        method: 'O-auth',
+        oauthProvider: oauthProvider || 'Google',
+        createdAt: new Date().toISOString()
+      }
+      users.push(user)
+    }
+    const token = `oauth-token-${user.id}`
+    return res.json({
+      success: true,
+      message: `Signed in via ${user.oauthProvider || 'OAuth'}`,
+      token,
+      user: { id: user.id, role: user.role, name: user.name, email: user.email, phone: user.phone }
+    })
+  }
+
+  // Default JWT-auth
+  if (!user || user.password !== password) {
+    return res.status(401).json({ error: 'Invalid email or password.' })
+  }
+
+  const token = `jwt-token-${user.id}`
+  res.json({
+    success: true,
+    message: 'Signed in successfully',
+    token,
+    user: { id: user.id, role: user.role, name: user.name, email: user.email, phone: user.phone }
+  })
+})
 
 // POST /api/customers/register
-// Handles customer registration
+// Description: Handles customer registration
+// Payload: Name, mobile (with OTP), email, location/pincode, property type, electricity bill upload, approx bill amount, required system size.
 app.post('/api/customers/register', (req, res) => {
   const {
     name,
@@ -82,7 +186,6 @@ app.post('/api/customers/register', (req, res) => {
 
   customers.push(newCustomer)
 
-  // Also record in users store if not already present
   if (!users.some((u) => u.email === email)) {
     users.push({
       id: `u-cust-${newCustomer.id}`,
@@ -104,8 +207,28 @@ app.post('/api/customers/register', (req, res) => {
   })
 })
 
+// ============================================================
+// 2. HOME & PUBLIC ROUTES
+// ============================================================
+// GET /api/home?type=on-grid | off-grid | hybrid-grid
+app.get('/api/home', (req, res) => {
+  const { type = 'on-grid' } = req.query
+  const data = homeContent[type] || homeContent['on-grid']
+
+  res.json({
+    success: true,
+    type,
+    data
+  })
+})
+
+// ============================================================
+// 3. CUSTOMER & PROJECT ROUTES
+// ============================================================
+
 // POST /api/projects/request
-// Submits the main "Get Solar Quote" form to generate a project request
+// Description: Submits the main "Get Solar Quote" form to generate a project request.
+// Payload: Location, monthly electricity bill, roof/property type, system preference (on-grid/off-grid/hybrid), approximate budget.
 app.post('/api/projects/request', (req, res) => {
   const {
     location,
@@ -148,23 +271,42 @@ app.post('/api/projects/request', (req, res) => {
 
   projects.push(newProject)
 
+  // Auto-generate matching quotes from verified companies
+  allCompanies.forEach((comp) => {
+    quotes.push({
+      id: `quote-${quotes.length + 1}`,
+      projectId,
+      companyId: comp.id,
+      company: comp.name,
+      rating: comp.rating || 4.8,
+      experience: comp.experience || '6+ Years',
+      estimatedPrice: approxBudget || '₹1,85,000',
+      warranty: '25-Year Performance / 5-Yr Installation',
+      verified: Boolean(comp.verified),
+      verificationBadges: comp.verificationBadges || ['GST Verified', 'Installer Verified'],
+      packageTitle: `${comp.name} ${systemPreference.toUpperCase()} Solar Package`,
+      details: `Complete turnkey installation by ${comp.name} including discom net-metering and subsidies.`,
+      status: 'submitted'
+    })
+  })
+
   res.status(201).json({
     success: true,
     message: 'Solar quote project request created successfully. Awaiting quotes from verified companies.',
     projectId,
     project: newProject,
-    matchedQuotesCount: 0,
-    quotes: []
+    matchedQuotesCount: quotes.filter((q) => q.projectId === projectId).length,
+    quotes: quotes.filter((q) => q.projectId === projectId)
   })
 })
 
 // GET /api/projects/:projectId/quotes
-// Retrieves multiple company quotes for the customer to compare
+// Description: Retrieves multiple company quotes for the customer to compare.
+// Response: Array of quotes including Company, Rating, Experience, Estimated Price, Warranty, and Verified status.
 app.get('/api/projects/:projectId/quotes', (req, res) => {
   const { projectId } = req.params
   const projectQuotes = quotes.filter((q) => q.projectId === projectId)
 
-  // Format array of quotes ensuring requested fields (Company, Rating, Experience, Estimated Price, Warranty, Verified)
   const formattedQuotes = projectQuotes.map((q) => ({
     id: q.id,
     projectId: q.projectId,
@@ -195,12 +337,47 @@ app.get('/api/projects/:projectId/quotes', (req, res) => {
   })
 })
 
-// ------------------------------------------------------------
-// 2. COMPANY APIS
-// ------------------------------------------------------------
+// ============================================================
+// 4. MARKETPLACE ROUTES
+// ============================================================
+// GET /api/marketplace?category=solar-module | inverter | cable | structure | BOS
+app.get('/api/marketplace', (req, res) => {
+  const { category, search, minPrice, maxPrice } = req.query
+  let filtered = [...marketplaceProducts]
+
+  if (category) {
+    filtered = filtered.filter((p) => p.category?.toLowerCase() === category.toLowerCase())
+  }
+
+  if (search) {
+    const q = search.toLowerCase()
+    filtered = filtered.filter(
+      (p) => p.name?.toLowerCase().includes(q) || p.brand?.toLowerCase().includes(q) || p.specs?.toLowerCase().includes(q)
+    )
+  }
+
+  if (minPrice) {
+    filtered = filtered.filter((p) => (p.numericPrice || 0) >= Number(minPrice))
+  }
+  if (maxPrice) {
+    filtered = filtered.filter((p) => (p.numericPrice || 0) <= Number(maxPrice))
+  }
+
+  res.json({
+    success: true,
+    category: category || 'all',
+    count: filtered.length,
+    products: filtered
+  })
+})
+
+// ============================================================
+// 5. COMPANY APIS (DASHBOARD & LEAD MANAGEMENT)
+// ============================================================
 
 // POST /api/companies/profile
-// Creates or updates a company profile
+// Description: Creates or updates a company profile.
+// Payload: GST certificate, business registration, installation experience, service locations, products, brands, pricing/packages, completed-project photos.
 app.post('/api/companies/profile', (req, res) => {
   const {
     companyId,
@@ -213,8 +390,7 @@ app.post('/api/companies/profile', (req, res) => {
     products,
     brands,
     pricingPackages,
-    completedProjectPhotos,
-    'completed-project photos': completedPhotosHyphen
+    completedProjectPhotos
   } = req.body || {}
 
   let company = allCompanies.find((c) => c.id === companyId)
@@ -230,14 +406,12 @@ app.post('/api/companies/profile', (req, res) => {
       location: Array.isArray(serviceLocations) && serviceLocations[0] ? serviceLocations[0] : '',
       employees: 0,
       projectsDone: 0,
-      founded: new Date().getFullYear(),
       teams: {},
       list: []
     }
     allCompanies.push(company)
   }
 
-  // Update company profile fields
   if (name) company.name = name
   if (gstCertificate) company.gstCertificate = gstCertificate
   if (businessRegistration) company.businessRegistration = businessRegistration
@@ -250,7 +424,6 @@ app.post('/api/companies/profile', (req, res) => {
   if (brands) company.brands = Array.isArray(brands) ? brands : [brands]
   if (pricingPackages) {
     company.pricingPackages = Array.isArray(pricingPackages) ? pricingPackages : [pricingPackages]
-    // Sync with listing table for main-point dashboard
     company.list = company.pricingPackages.map((p) => ({
       title: p.name || p.title || '',
       price: p.price || '',
@@ -258,8 +431,9 @@ app.post('/api/companies/profile', (req, res) => {
       warranty: p.warranty || ''
     }))
   }
-  const photos = completedProjectPhotos || completedPhotosHyphen
-  if (photos) company.completedProjectPhotos = Array.isArray(photos) ? photos : [photos]
+  if (completedProjectPhotos) {
+    company.completedProjectPhotos = Array.isArray(completedProjectPhotos) ? completedProjectPhotos : [completedProjectPhotos]
+  }
 
   company.updatedAt = new Date().toISOString()
 
@@ -271,12 +445,11 @@ app.post('/api/companies/profile', (req, res) => {
 })
 
 // GET /api/companies/leads
-// Retrieves the list of available customer leads and previous projects
+// Description: Retrieves the list of available customer leads and previous projects.
 app.get('/api/companies/leads', (req, res) => {
   const { companyId } = req.query
   const filteredLeads = companyId ? leads.filter((l) => l.companyId === companyId) : leads
 
-  // Attach previous project history
   const projectHistory = projects.map((p) => {
     const associatedLead = leads.find((l) => l.projectId === p.id)
     return {
@@ -295,24 +468,18 @@ app.get('/api/companies/leads', (req, res) => {
 })
 
 // PUT /api/companies/leads/:leadId
-// Updates the lead pipeline status or submits a quotation
+// Description: Updates the lead pipeline status or submits a quotation.
+// Payload: New status (Accept/Reject, Contacted, Site Visit, Quote Submitted, Won/Lost) and quote details.
 app.put('/api/companies/leads/:leadId', (req, res) => {
   const { leadId } = req.params
-  const {
-    status,
-    subStatus,
-    quoteDetails,
-    quote,
-    notes,
-    action
-  } = req.body || {}
+  const { status, subStatus, quoteDetails, quote, notes } = req.body || {}
 
   const lead = leads.find((l) => l.id === leadId)
   if (!lead) {
     return res.status(404).json({ error: `Lead ${leadId} not found` })
   }
 
-  const effectiveStatus = status || action || lead.status
+  const effectiveStatus = status || lead.status
   lead.status = effectiveStatus
   lead.subStatus = subStatus || effectiveStatus
   lead.updatedAt = new Date().toISOString()
@@ -321,72 +488,12 @@ app.put('/api/companies/leads/:leadId', (req, res) => {
   lead.history.push({
     status: effectiveStatus,
     timestamp: new Date().toISOString(),
-    note: notes || (quoteDetails ? `Quote updated: ${quoteDetails.price || ''}` : `Status changed to ${effectiveStatus}`)
+    note: notes || `Status changed to ${effectiveStatus}`
   })
 
   const incomingQuote = quoteDetails || quote
   if (incomingQuote) {
-    lead.quoteDetails = {
-      ...(lead.quoteDetails || {}),
-      ...incomingQuote,
-      updatedAt: new Date().toISOString()
-    }
-
-    // Sync or add to global quotes array if projectId exists
-    if (lead.projectId) {
-      const existingQuote = quotes.find((q) => q.projectId === lead.projectId && q.companyId === lead.companyId)
-      if (existingQuote) {
-        existingQuote.estimatedPrice = incomingQuote.price || existingQuote.estimatedPrice
-        existingQuote.warranty = incomingQuote.warranty || existingQuote.warranty
-        existingQuote.details = incomingQuote.notes || existingQuote.details
-        existingQuote.status = effectiveStatus.toLowerCase().includes('won') ? 'accepted' : 'submitted'
-      } else {
-        const company = allCompanies.find((c) => c.id === lead.companyId)
-        quotes.push({
-          id: `quote-${quotes.length + 1}`,
-          projectId: lead.projectId,
-          companyId: lead.companyId,
-          company: company?.name || '',
-          rating: company?.rating || 0,
-          experience: company?.experience || '',
-          estimatedPrice: incomingQuote.price || '',
-          warranty: incomingQuote.warranty || '',
-          verified: company?.verified || false,
-          verificationBadges: company?.verificationBadges || [],
-          packageTitle: incomingQuote.packageTitle || '',
-          details: incomingQuote.notes || '',
-          status: 'submitted',
-          createdAt: new Date().toISOString()
-        })
-      }
-    }
-  }
-
-  // If status is Won, update project status & track commission
-  if (effectiveStatus === 'Won' || effectiveStatus === 'Won/Lost') {
-    if (lead.projectId) {
-      const project = projects.find((p) => p.id === lead.projectId)
-      if (project) project.status = 'in_progress'
-
-      // Add to payment tracking if not already added
-      const priceNum = Number(String(lead.quoteDetails?.price || '').replace(/[^0-9]/g, '')) || 0
-      if (!paymentTracking.some((p) => p.projectId === lead.projectId) && priceNum > 0) {
-        const commEarned = Math.round(priceNum * 0.04)
-        paymentTracking.push({
-          id: `pay-${paymentTracking.length + 1}`,
-          projectId: lead.projectId,
-          customerName: lead.customerName,
-          companyId: lead.companyId,
-          companyName: allCompanies.find((c) => c.id === lead.companyId)?.name || '',
-          projectValue: priceNum,
-          commissionRate: '4%',
-          commissionEarned: commEarned,
-          paymentStatus: 'Pending',
-          paidAt: null,
-          payoutRef: `PAY-REC-${Date.now().toString().slice(-6)}`
-        })
-      }
-    }
+    lead.quoteDetails = { ...(lead.quoteDetails || {}), ...incomingQuote }
   }
 
   res.json({
@@ -397,7 +504,8 @@ app.put('/api/companies/leads/:leadId', (req, res) => {
 })
 
 // GET /api/companies/metrics
-// Fetches sales funnel metrics for the company dashboard
+// Description: Fetches sales funnel metrics for the company dashboard.
+// Response: Totals for Leads, Contacted, Site Visits, Quotes, and Projects Won.
 app.get('/api/companies/metrics', (req, res) => {
   const { companyId } = req.query
   const metrics = getCompanyMetrics(companyId)
@@ -416,12 +524,140 @@ app.get('/api/companies/metrics', (req, res) => {
   })
 })
 
-// ------------------------------------------------------------
-// 3. ADMIN APIS
-// ------------------------------------------------------------
+// ============================================================
+// 6. MAIN POINT (CORE DASHBOARD) ROUTES
+// ============================================================
+
+// GET /api/main-point/complain/listing
+// Product listing only (no complex API generation)
+app.get('/api/main-point/complain/listing', (_req, res) => {
+  const allListings = []
+  allCompanies.forEach((comp) => {
+    if (Array.isArray(comp.list)) {
+      comp.list.forEach((item, index) => {
+        allListings.push({
+          id: `${comp.id}-item-${index + 1}`,
+          companyId: comp.id,
+          companyName: comp.name,
+          title: item.title,
+          price: item.price,
+          duration: item.duration,
+          warranty: item.warranty,
+          verified: comp.verified
+        })
+      })
+    }
+  })
+
+  res.json({
+    success: true,
+    count: allListings.length,
+    listing: allListings
+  })
+})
+
+// POST /api/main-point/complain/call-log
+// To store call logs
+app.post('/api/main-point/complain/call-log', (req, res) => {
+  const { companyId, companyName, customer, phone, type, message, notes } = req.body || {}
+
+  const log = {
+    id: `cl-${callLogs.length + 1}`,
+    companyId: companyId || null,
+    companyName: companyName || allCompanies.find((c) => c.id === companyId)?.name || 'Direct Customer Call',
+    customer: customer || 'Customer',
+    phone: phone || '',
+    type: type || 'Inquiry',
+    message: message || notes || '',
+    status: 'Logged',
+    date: new Date().toISOString()
+  }
+
+  callLogs.push(log)
+
+  res.status(201).json({
+    success: true,
+    message: 'Call log stored',
+    log
+  })
+})
+
+// POST /api/main-point/complain/company/:id
+// Dynamically generated endpoint for listed companies
+app.post('/api/main-point/complain/company/:id', (req, res) => {
+  const { id } = req.params
+  const { customerName, phone, complaintType, description } = req.body || {}
+
+  const company = allCompanies.find((c) => c.id === id)
+  const ticketId = `TKT-${Math.floor(100000 + Math.random() * 900000)}`
+
+  const complaint = {
+    ticketId,
+    companyId: id,
+    companyName: company?.name || `Company ${id}`,
+    customerName: customerName || 'Verified Customer',
+    phone: phone || '',
+    complaintType: complaintType || 'Service Inquiry',
+    description: description || '',
+    status: 'Under Review',
+    createdAt: new Date().toISOString()
+  }
+
+  callLogs.push({
+    id: `cl-${callLogs.length + 1}`,
+    companyId: id,
+    companyName: company?.name || `Company ${id}`,
+    customer: customerName || 'Customer',
+    phone: phone || '',
+    type: 'Complaint',
+    message: `[Ticket ${ticketId}] ${complaintType || 'Issue'}: ${description || ''}`,
+    status: 'Action Required',
+    date: new Date().toISOString()
+  })
+
+  res.status(201).json({
+    success: true,
+    message: `Complaint logged against ${company?.name || id}`,
+    ticket: complaint
+  })
+})
+
+// GET /api/main-point/installer/company/:id
+// Returns arrays/objects for Team 1, Team 2, Team 3
+app.get('/api/main-point/installer/company/:id', (req, res) => {
+  const { id } = req.params
+  const company = allCompanies.find((c) => c.id === id) || allCompanies[0]
+
+  res.json({
+    success: true,
+    company: {
+      id: company?.id,
+      name: company?.name
+    },
+    teams: company?.teams || {
+      team1: { lead: 'Team 1 Lead', members: 4, area: 'Central' },
+      team2: { lead: 'Team 2 Lead', members: 5, area: 'North' },
+      team3: { lead: 'Team 3 Lead', members: 3, area: 'South' }
+    }
+  })
+})
+
+// GET /api/main-point/docs
+// Retrieves API or system documentation
+app.get('/api/main-point/docs', (_req, res) => {
+  res.json({
+    success: true,
+    docs: apiDocs
+  })
+})
+
+// ============================================================
+// 7. ADMIN CONTROL APIS
+// ============================================================
 
 // GET /api/admin/dashboard
-// Retrieves high-level marketplace metrics for the admin control centre
+// Description: Retrieves high-level marketplace metrics for the admin control centre.
+// Response: Total customers, total companies, verified companies, new leads, active projects, completed projects, project value, commission earned, pending commission.
 app.get('/api/admin/dashboard', (_req, res) => {
   const metrics = getAdminDashboardMetrics()
   res.json({
@@ -445,21 +681,17 @@ app.get('/api/admin/dashboard', (_req, res) => {
       commissionEarned: metrics.commissionEarned,
       'Commission earned': metrics.commissionEarned,
       pendingCommission: metrics.pendingCommission,
-      'Pending commission': metrics.pendingCommission,
-      raw: metrics
+      'Pending commission': metrics.pendingCommission
     }
   })
 })
 
 // PUT /api/admin/companies/:companyId/verify
-// Manually verifies a company and assigns verification badges
+// Description: Manually verifies a company.
+// Payload: Verification badges to apply (GST Verified, Business Verified, Installer Verified, Top Rated).
 app.put('/api/admin/companies/:companyId/verify', (req, res) => {
   const { companyId } = req.params
-  const {
-    verified = true,
-    verificationBadges,
-    badges
-  } = req.body || {}
+  const { verified = true, verificationBadges, badges } = req.body || {}
 
   const company = allCompanies.find((c) => c.id === companyId)
   if (!company) {
@@ -470,13 +702,12 @@ app.put('/api/admin/companies/:companyId/verify', (req, res) => {
   const newBadges = verificationBadges || badges
   if (Array.isArray(newBadges)) {
     company.verificationBadges = newBadges
-  } else if (company.verified && (!company.verificationBadges || company.verificationBadges.length === 0)) {
+  } else if (company.verified) {
     company.verificationBadges = ['GST Verified', 'Business Verified', 'Installer Verified', 'Top Rated']
   }
 
   company.verifiedAt = new Date().toISOString()
 
-  // Also update in all company quotes
   quotes.forEach((q) => {
     if (q.companyId === companyId) {
       q.verified = company.verified
@@ -498,253 +729,34 @@ app.put('/api/admin/companies/:companyId/verify', (req, res) => {
 })
 
 // GET /api/admin/management
-// Retrieves operational management data
+// Description: Retrieves operational management data.
+// Response: Company performance metrics, customer complaints, and payment tracking.
 app.get('/api/admin/management', (_req, res) => {
   const data = getAdminManagementData()
   res.json({
     success: true,
     timestamp: new Date().toISOString(),
-    data: {
-      companyPerformance: data.companyPerformance,
-      'Company performance metrics': data.companyPerformance,
-      customerComplaints: data.customerComplaints,
-      'Customer complaints': data.customerComplaints,
-      paymentTracking: data.paymentTracking,
-      'Payment tracking': data.paymentTracking
-    }
+    data
   })
-})
-
-// ------------------------------------------------------------
-// 4. HOME ROUTES
-// GET /api/home?type=on-grid | off-grid | hybrid-grid
-// ------------------------------------------------------------
-app.get('/api/home', (req, res) => {
-  const { type = 'on-grid' } = req.query
-  const content = homeContent[type]
-  if (!content) {
-    return res.status(400).json({ error: 'Invalid type. Use on-grid, off-grid or hybrid-grid.' })
-  }
-  res.json({
-    success: true,
-    type,
-    data: content
-  })
-})
-
-// ------------------------------------------------------------
-// 5. AUTHENTICATION ROUTES
-// POST /api/signup  { role: 'seller-co' | 'install-co' | 'user', ...userDetails }
-// POST /api/signin  { method: 'O-auth' | 'JWT-auth' | 'no-password', ...credentials }
-// ------------------------------------------------------------
-const validRoles = ['seller-co', 'install-co', 'user']
-const validMethods = ['O-auth', 'JWT-auth', 'no-password']
-
-app.post('/api/signup', (req, res) => {
-  const { role, name, email, password, companyName, phone } = req.body || {}
-  if (!validRoles.includes(role)) {
-    return res.status(400).json({ error: `role must be one of: ${validRoles.join(', ')}` })
-  }
-  if (!name || !email) {
-    return res.status(400).json({ error: 'name and email are required' })
-  }
-  const existing = users.find((u) => u.email === email)
-  if (existing) {
-    return res.status(409).json({ error: 'An account with this email already exists.' })
-  }
-  const newUser = {
-    id: `u-${users.length + 1}`,
-    role,
-    name,
-    email,
-    password: password || 'no-password',
-    companyName: companyName || null,
-    phone: phone || null,
-    method: 'JWT-auth',
-    createdAt: new Date().toISOString()
-  }
-  users.push(newUser)
-  const { password: _pw, ...safeUser } = newUser
-  res.status(201).json({
-    success: true,
-    message: 'Account created successfully',
-    token: `jwt-token-${newUser.id}`,
-    user: safeUser
-  })
-})
-
-app.post('/api/signin', (req, res) => {
-  const { method, email, password, token } = req.body || {}
-  if (!validMethods.includes(method)) {
-    return res.status(400).json({ error: `method must be one of: ${validMethods.join(', ')}` })
-  }
-
-  // O-auth: only existing, registered users can sign in via OAuth
-  if (method === 'O-auth') {
-    const user = users.find((u) => u.email === email)
-    if (!user) {
-      return res.status(401).json({ error: 'No account found for this email. Please sign up first.' })
-    }
-    return res.json({
-      success: true,
-      method: 'O-auth',
-      token: token || '',
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, method: user.method }
-    })
-  }
-
-  // no-password: magic-link style access using only email
-  if (method === 'no-password') {
-    if (!email) return res.status(400).json({ error: 'email is required for no-password sign in' })
-    const user = users.find((u) => u.email === email)
-    if (!user) {
-      return res.status(401).json({ error: 'No account found for this email. Please sign up first.' })
-    }
-    return res.json({ success: true, method: 'no-password', token: 'magic-link-token', user })
-  }
-
-  // JWT-auth: standard email + password
-  const user = users.find((u) => u.email === email && u.password === password)
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid email or password.' })
-  }
-  const { password: _pw, ...safeUser } = user
-  res.json({ success: true, method: 'JWT-auth', token: `jwt-token-${user.id}`, user: safeUser })
-})
-
-// ------------------------------------------------------------
-// 6. MARKETPLACE ROUTES
-// GET /api/marketplace?category=...
-// ------------------------------------------------------------
-const categories = ['solar-module', 'inverter', 'cable', 'structure', 'BOS']
-
-app.get('/api/marketplace', (req, res) => {
-  const { category } = req.query
-  if (!category) {
-    return res.json({ success: true, count: marketplaceProducts.length, products: marketplaceProducts })
-  }
-  if (!categories.includes(category)) {
-    return res.status(400).json({ error: `category must be one of: ${categories.join(', ')}` })
-  }
-  const products = marketplaceProducts.filter((p) => p.category === category)
-  res.json({ success: true, category, count: products.length, products })
-})
-
-// ------------------------------------------------------------
-// 7. CORE MAIN POINT (COMPLAIN & LISTING) ROUTES
-// ------------------------------------------------------------
-
-// GET /api/main-point/complain/listing — product listing only
-app.get('/api/main-point/complain/listing', (_req, res) => {
-  const listing = allCompanies.map((c) => ({
-    id: c.id,
-    name: c.name,
-    type: c.type,
-    verified: c.verified,
-    verificationBadges: c.verificationBadges || [],
-    rating: c.rating,
-    location: c.location,
-    services: c.services,
-    listings: c.list || []
-  }))
-  res.json({ success: true, count: listing.length, listing })
-})
-
-// POST /api/main-point/complain/call-log — store call logs
-app.post('/api/main-point/complain/call-log', (req, res) => {
-  const { companyId, companyName, customer, phone, issue, note, agent, status } = req.body || {}
-  if (!companyName || !customer) {
-    return res.status(400).json({ error: 'companyName and customer are required' })
-  }
-  const log = {
-    id: `cl-${callLogs.length + 1}`,
-    companyId: companyId || null,
-    companyName,
-    customer,
-    phone: phone || null,
-    issue: issue || '',
-    note: note || '',
-    agent: agent || '',
-    status: status || 'logged',
-    createdAt: new Date().toISOString()
-  }
-  callLogs.push(log)
-  res.status(201).json({ success: true, message: 'Call log stored', log })
-})
-
-// GET /api/main-point/complain/call-log — read stored call logs
-app.get('/api/main-point/complain/call-log', (_req, res) => {
-  res.json({ success: true, count: callLogs.length, callLogs })
-})
-
-// POST /api/main-point/complain/company/:id — dynamically generated endpoint
-app.post('/api/main-point/complain/company/:id', (req, res) => {
-  const company = allCompanies.find((c) => c.id === req.params.id)
-  if (!company) {
-    return res.status(404).json({ error: 'Company not found' })
-  }
-  const ticket = {
-    ticketId: `TKT-${Date.now().toString().slice(-6)}`,
-    companyId: company.id,
-    companyName: company.name,
-    customer: req.body?.customer || '',
-    phone: req.body?.phone || '',
-    issue: req.body?.issue || '',
-    note: req.body?.note || '',
-    status: req.body?.status || 'open',
-    generatedAt: new Date().toISOString()
-  }
-  callLogs.push({
-    id: `cl-${callLogs.length + 1}`,
-    companyId: company.id,
-    companyName: company.name,
-    customer: ticket.customer,
-    phone: ticket.phone,
-    issue: ticket.issue,
-    note: ticket.note,
-    agent: '',
-    status: 'open',
-    createdAt: ticket.generatedAt
-  })
-  res.status(201).json({ success: true, message: `Complaint logged against ${company.name}`, ticket })
-})
-
-// GET /api/main-point/installer/company/ — default Team 1, Team 2 and Team 3 data
-app.get('/api/main-point/installer/company/', (_req, res) => {
-  res.json({
-    success: true,
-    teams: {}
-  })
-})
-
-// GET /api/main-point/installer/company/:id — teams for a specific company
-app.get('/api/main-point/installer/company/:id', (req, res) => {
-  const company = allCompanies.find((c) => c.id === req.params.id)
-  if (!company) {
-    return res.status(404).json({ error: 'Company not found' })
-  }
-  res.json({
-    success: true,
-    company: { id: company.id, name: company.name },
-    teams: company.teams || {}
-  })
-})
-
-// GET /api/main-point/docs — API / system documentation
-app.get('/api/main-point/docs', (_req, res) => {
-  res.json({ success: true, docs: apiDocs })
 })
 
 // Health check
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'Solar E-Market API v2.0', time: new Date().toISOString() })
+  res.json({
+    status: 'ok',
+    service: 'ENRG Solar Marketplace API',
+    version: '2.0.0',
+    time: new Date().toISOString()
+  })
 })
 
-// 404 fallback
-app.use('/api', (_req, res) => {
-  res.status(404).json({ error: 'API route not found' })
+// 404 for unhandled API routes
+app.use('/api/*', (req, res) => {
+  res.status(404).json({
+    error: `Endpoint ${req.method} ${req.originalUrl} not found. Please refer to /api/main-point/docs.`
+  })
 })
 
 app.listen(PORT, () => {
-  console.log(`Solar E-Market API running at http://localhost:${PORT}`)
+  console.log(`⚡ ENRG Solar Marketplace API running on http://localhost:${PORT}`)
 })
