@@ -45,6 +45,7 @@
   --coda-shadow-floating: 0 30px 60px -12px rgba(15, 23, 42, 0.15), 0 18px 36px -18px rgba(15, 23, 42, 0.1);
   
   --coda-nav-height: 72px;
+  --coda-nav-gap: 12px;
 }
 
 /* ============================================================
@@ -162,7 +163,7 @@
 /* Mega Menu Dropdown Panel */
 .coda-megamenu-panel {
   position: absolute;
-  top: calc(var(--coda-nav-height) + 12px);
+  top: calc(var(--coda-nav-height) + var(--coda-nav-gap));
   left: 0;
   width: 100%;
   background: #ffffff;
@@ -187,6 +188,18 @@
   visibility: visible;
   transform: translateY(0) scale(1);
   pointer-events: auto;
+}
+
+/* Invisible hover "bridge" that fills the gap between the navbar and the
+   dropdown panel, so the menu never closes while the cursor is travelling
+   from a menu trigger down into the panel. */
+.coda-megamenu-panel.open::before {
+  content: '';
+  position: absolute;
+  top: calc(-1 * var(--coda-nav-gap));
+  left: 0;
+  right: 0;
+  height: var(--coda-nav-gap);
 }
 
 .coda-megamenu-grid {

@@ -248,13 +248,17 @@ export const MEGA_MENU_DATA = {
   }
 }
 
-export default function CodaMegaMenu({ activeCategory, onClose }) {
+export default function CodaMegaMenu({ activeCategory, onClose, onMouseEnter, onMouseLeave }) {
   if (!activeCategory || !MEGA_MENU_DATA[activeCategory]) return null
 
   const category = MEGA_MENU_DATA[activeCategory]
 
   return (
-    <div className="coda-megamenu-panel open">
+    <div
+      className="coda-megamenu-panel open"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
       <div className="coda-megamenu-grid">
         {category.sections.map((sec, idx) => (
           <div key={idx} className="coda-megamenu-section">

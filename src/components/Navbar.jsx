@@ -24,7 +24,14 @@ export default function Navbar() {
   const handleMouseLeave = () => {
     closeTimerRef.current = setTimeout(() => {
       setActiveMenu(null)
-    }, 250)
+    }, 400)
+  }
+
+  const handlePanelEnter = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
   }
 
   const handleLogout = () => {
@@ -166,7 +173,12 @@ export default function Navbar() {
         </nav>
 
         {/* Mega Menu Dropdown */}
-        <CodaMegaMenu activeCategory={activeMenu} onClose={() => setActiveMenu(null)} />
+        <CodaMegaMenu
+          activeCategory={activeMenu}
+          onClose={() => setActiveMenu(null)}
+          onMouseEnter={handlePanelEnter}
+          onMouseLeave={handleMouseLeave}
+        />
       </div>
 
       {/* Mobile Slide-Out Drawer */}
